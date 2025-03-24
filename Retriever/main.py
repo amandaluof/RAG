@@ -6,6 +6,8 @@ from tqdm import tqdm
 from sentence_transformers import SentenceTransformer
 from datasets import load_dataset
 
+from extract_search import DenseRetrievalExactSearch
+
 def buld_csv(folders):
     # 用于存储数据的列表
     data = []
@@ -46,19 +48,29 @@ dense_retriever = DenseRetrievalExactSearch(
         )
 
 # corpus creating
-# folders = ["../data/wiki/attraction_split", "../data/wiki/city_split", "../data/wiki/attraction", "../data/wiki/city"]
-folders = ["../data/wiki/attraction"]
+folders = ["../data/wiki/attraction_split", "../data/wiki/city_split", "../data/wiki/attraction", "../data/wiki/city"]
+# folders = ["../data/wiki/attraction"]
 buld_csv(folders)
 
 dataset = load_dataset("csv", data_files="dataset.csv")
-dataset = dataset.add_column("id", range(len(dataset)))
+dataset["train"] = dataset["train"].add_column("id", range(len(dataset["train"])))
+corpus = dataset["train"]
 
-import pdb;pdb.set_trace()
 search_params = {"top_k":10, "score_function":"cos_sim", "return_sorted":True}
-dense_retriever.search(
+
+queries = {0: "new york", 1: "chicago"}
+
+res = dense_retriever.search(
     corpus,
     queries,
-    top_k,
-    score_function,
-    return_sorted,
+    **search_params
 )
+
+for query_id, retrieved_docs in res.items():
+    print(f"\nQuery {query_id}: {queries[query_id]}")  # 输出查询内容
+    print("Top-K retrieved documents:")
+    sorted_docs = sorted(retrieved_docs.items(), key=lambda x: x[1], reverse=True)
+    
+    for doc_id, score in sorted_docs.items():
+        doc = corpus[doc_id]  # 获取文档内容
+        print(f"  - ID: {doc_id}, Title: {doc['title']}, Score: {score:.4f}")

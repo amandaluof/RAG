@@ -49,7 +49,13 @@ class DenseRetrievalExactSearch(BaseSearch):
         query_ids = list(queries.keys())
         self.results = {qid: {} for qid in query_ids}
         queries = [queries[qid] for qid in queries]
-        query_embeddings = self.model.encode_queries(
+        # query_embeddings = self.model.encode_queries(
+        #     queries,
+        #     batch_size=self.batch_size,
+        #     show_progress_bar=self.show_progress_bar,
+        #     convert_to_tensor=self.convert_to_tensor,
+        # )
+        query_embeddings = self.model.encode(
             queries,
             batch_size=self.batch_size,
             show_progress_bar=self.show_progress_bar,
@@ -57,12 +63,12 @@ class DenseRetrievalExactSearch(BaseSearch):
         )
 
         logger.info("Sorting Corpus by document length (Longest first)...")
-
         corpus_ids = sorted(
-            corpus,
-            key=lambda k: len(corpus[k].get("title", "") + corpus[k].get("text", "")),
+            range(len(corpus)),  # 生成索引 0, 1, 2, ...
+            key=lambda k: len(corpus[k]["title"] + corpus[k]["text"]),  
             reverse=True,
         )
+        
         corpus = [corpus[cid] for cid in corpus_ids]
 
         logger.info("Encoding Corpus in batches... Warning: This might take a while!")
@@ -76,7 +82,13 @@ class DenseRetrievalExactSearch(BaseSearch):
             corpus_end_idx = min(corpus_start_idx + self.corpus_chunk_size, len(corpus))
 
             # Encode chunk of corpus
-            sub_corpus_embeddings = self.model.encode_corpus(
+            # sub_corpus_embeddings = self.model.encode_corpus(
+            #     corpus[corpus_start_idx:corpus_end_idx],
+            #     batch_size=self.batch_size,
+            #     show_progress_bar=self.show_progress_bar,
+            #     convert_to_tensor=self.convert_to_tensor,
+            # )
+            sub_corpus_embeddings = self.model.encode(
                 corpus[corpus_start_idx:corpus_end_idx],
                 batch_size=self.batch_size,
                 show_progress_bar=self.show_progress_bar,
@@ -90,7 +102,7 @@ class DenseRetrievalExactSearch(BaseSearch):
             # Get top-k values
             cos_scores_top_k_values, cos_scores_top_k_idx = torch.topk(
                 cos_scores,
-                min(top_k + 1, len(cos_scores[1])),
+                min(top_k + 1, len(cos_scores[0])),
                 dim=1,
                 largest=True,
                 sorted=return_sorted,
@@ -116,31 +128,4 @@ class DenseRetrievalExactSearch(BaseSearch):
 
         return self.results
 
-
-if __name__ == "__main__":
-    from sentence_transformers import SentenceTransformer
-    text_embedding_model = SentenceTransformer("dunzhang/stella_en_400M_v5",
-    trust_remote_code=True)
-    # It can be worked in CPU.
-
-    retriver_params = {"batch_size":128, "corpus_size":5000}
-    dense_retriever = DenseRetrievalExactSearch(
-            text_embedding_model,
-            **retriver_params,
-            # batch_size,
-            # corpus_size
-            )
-    
-    # corpus creating
-    
-
-
-    search_params = {"top_k":10, "score_function":"cos_sim", "return_sorted":True}
-    dense_retriever.search(
-        corpus,
-        queries,
-        top_k,
-        score_function,
-        return_sorted,
-    )
      
